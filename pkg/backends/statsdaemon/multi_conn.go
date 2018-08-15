@@ -22,13 +22,18 @@ func MultiDialTimeout(
 	for _, address := range addresses {
 		conn, err := net.DialTimeout(proto, address, timeout)
 		if err != nil {
-			return MultiConn{}, fmt.Errorf(
-				"can't connect to %s: %s", address, err,
-			)
+			log.Errorf("can't connect to %s: %s", address, err)
+			continue
 		}
 
 		upstreams = append(upstreams, conn)
+	}
 
+	if len(upstreams) != len(addresses) {
+		log.Errorf(
+			"only %d of %d upstreams connected",
+			len(upstreams), len(addresses),
+		)
 	}
 
 	return MultiConn{upstreams}, nil
