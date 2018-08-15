@@ -22,7 +22,10 @@ func MultiDialTimeout(
 	for _, address := range addresses {
 		conn, err := net.DialTimeout(proto, address, timeout)
 		if err != nil {
-			log.Errorf("can't connect to %s: %s", address, err)
+			log.Errorf(
+				"[%s] can't connect to %s: %s",
+				BackendName, address, err,
+			)
 			continue
 		}
 
@@ -32,18 +35,19 @@ func MultiDialTimeout(
 	switch len(upstreams) {
 
 	case len(addresses):
-		return MultiConn{upstreams}, nil
+		break
 	case 0:
 		return MultiConn{}, fmt.Errorf(
 			"can't dial any of %s upstreams", addresses,
 		)
 	default:
 		log.Errorf(
-			"only %d of %d upstreams connected",
-			len(upstreams), len(addresses),
+			"[%s] only %d of %d upstreams connected",
+			BackendName, len(upstreams), len(addresses),
 		)
-		return MultiConn{upstreams}, nil
 	}
+
+	return MultiConn{upstreams}, nil
 }
 
 func (mcon MultiConn) Read(b []byte) (int, error) {
@@ -94,8 +98,8 @@ func (mcon MultiConn) Write(b []byte) (int, error) {
 	default:
 		if len(errs) > 0 {
 			log.Errorf(
-				"error writing to upstreams: %s",
-				strings.Join(errs, "; "),
+				"[%s] error writing to upstreams: %s",
+				BackendName, strings.Join(errs, "; "),
 			)
 		}
 		return writenRet, nil
