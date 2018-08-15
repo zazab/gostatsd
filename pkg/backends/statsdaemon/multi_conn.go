@@ -29,14 +29,21 @@ func MultiDialTimeout(
 		upstreams = append(upstreams, conn)
 	}
 
-	if len(upstreams) != len(addresses) {
+	switch len(upstreams) {
+
+	case len(addresses):
+		return MultiConn{upstreams}, nil
+	case 0:
+		return MultiConn{}, fmt.Errorf(
+			"can't dial any of %s upstreams", addresses,
+		)
+	default:
 		log.Errorf(
 			"only %d of %d upstreams connected",
 			len(upstreams), len(addresses),
 		)
+		return MultiConn{upstreams}, nil
 	}
-
-	return MultiConn{upstreams}, nil
 }
 
 func (mcon MultiConn) Read(b []byte) (int, error) {
