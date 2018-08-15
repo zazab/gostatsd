@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -195,17 +196,39 @@ func constructEventMessage(e *gostatsd.Event) *bytes.Buffer {
 }
 
 // NewClient constructs a new statsd backend client.
-func NewClient(address string, dialTimeout, writeTimeout time.Duration, disableTags, tcpTransport bool, tlsConfig *tls.Config) (*Client, error) {
-	if address == "" {
-		return nil, fmt.Errorf("[%s] address is required", BackendName)
+func NewClient(
+	addresses []string,
+	dialTimeout,
+	writeTimeout time.Duration,
+	disableTags,
+	tcpTransport bool,
+	tlsConfig *tls.Config,
+) (*Client, error) {
+	if len(addresses) == 0 {
+		return nil, fmt.Errorf(
+			"[%s] at least one address is required",
+			BackendName,
+		)
 	}
 	if dialTimeout <= 0 {
-		return nil, fmt.Errorf("[%s] dialTimeout should be positive", BackendName)
+		return nil, fmt.Errorf(
+			"[%s] dialTimeout should be positive",
+			BackendName,
+		)
 	}
 	if writeTimeout < 0 {
-		return nil, fmt.Errorf("[%s] writeTimeout should be non-negative", BackendName)
+		return nil, fmt.Errorf(
+			"[%s] writeTimeout should be non-negative",
+			BackendName,
+		)
 	}
-	log.Infof("[%s] address=%s dialTimeout=%s writeTimeout=%s", BackendName, address, dialTimeout, writeTimeout)
+	log.Infof(
+		"[%s] addresses=%s dialTimeout=%s writeTimeout=%s",
+		BackendName,
+		addresses,
+		dialTimeout,
+		writeTimeout,
+	)
 	var packetSize int
 	var connFactory func() (net.Conn, error)
 
@@ -215,20 +238,18 @@ func NewClient(address string, dialTimeout, writeTimeout time.Duration, disableT
 			return nil, fmt.Errorf("[%s] tcp_transport is required when using tls_transport", BackendName)
 		}
 
-		packetSize = maxTCPPacketSize
-		dialer := &net.Dialer{Timeout: dialTimeout}
 		connFactory = func() (net.Conn, error) {
-			return tls.DialWithDialer(dialer, "tcp", address, tlsConfig)
+			return nil, errors.New("not implemented")
 		}
 	} else if tcpTransport {
 		packetSize = maxTCPPacketSize
 		connFactory = func() (net.Conn, error) {
-			return net.DialTimeout("tcp", address, dialTimeout)
+			return MultiDialTimeout("tcp", addresses, dialTimeout)
 		}
 	} else {
 		packetSize = maxUDPPacketSize
 		connFactory = func() (net.Conn, error) {
-			return net.DialTimeout("udp", address, dialTimeout)
+			return MultiDialTimeout("udp", addresses, dialTimeout)
 		}
 	}
 	return &Client{
@@ -266,7 +287,7 @@ func NewClientFromViper(v *viper.Viper) (gostatsd.Backend, error) {
 		return nil, err
 	}
 	return NewClient(
-		g.GetString("address"),
+		g.GetStringSlice("address"),
 		g.GetDuration("dial_timeout"),
 		g.GetDuration("write_timeout"),
 		g.GetBool("disable_tags"),
